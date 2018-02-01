@@ -10,10 +10,10 @@ speed = 0.5
 keyboard_delay = 0.01 # seconds
 
 # Serial communication parameters.
-car_id = 'Y'
-port = 'COM1'
+car_id = 'y'
+port = 'COM6'
 baud = 115200
-send_delay = 0.1  # seconds
+send_delay = 0.2  # seconds
 
 # Initialise the serial communication port.
 comms = SerialComms(port, baud, send_delay)
@@ -31,19 +31,22 @@ while key != Keys.ESCAPE:
         if key == Keys.SPECIAL:
             key = Keys(ord(getch()))
             if key == Keys.ARROW_UP:
-                speed += 0.05
+                speed += 0.1
                 speed = speed if speed <= 1 else 1
             elif key == Keys.ARROW_DOWN:
-                speed -= 0.05
+                speed -= 0.1
                 speed = speed if speed >= 0 else 0
             elif key == Keys.ARROW_RIGHT:
-                steer += 0.05
+                steer += 0.1
                 steer = steer if steer <= 1 else 1
             elif key == Keys.ARROW_LEFT:
-                steer -= 0.05
+                steer -= 0.1
                 steer = steer if steer >= 0 else 0
 
-            comms.set_message(PacketSpeed(car_id, speed).__str__() +
+            comms.set_message(PacketSpeed(car_id, speed).__str__() + '\r\n' +
+                              PacketSteer(car_id, steer).__str__() + '\r\n')
+
+            print(PacketSpeed(car_id, speed).__str__() +
                               PacketSteer(car_id, steer).__str__())
 
     time.sleep(keyboard_delay)
