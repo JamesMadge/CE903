@@ -8,7 +8,7 @@ import copy
 import collections as col
 import os
 import time
-
+from matplotlib import pyplot as plt
 
 class TorcsEnv:
     terminal_judge_start = 500  # Speed limit is applied after this step
@@ -46,7 +46,7 @@ class TorcsEnv:
         client = self.client
         client.get_servers_input()  # Get the initial input from torcs
 	
-        obs = client.S.d  # Get the current full-observation from torcs
+        obs = client.ServerState.data  # Get the current full-observation from torcs
         self.obs=obs
         if throttle is False:
             self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,))
@@ -78,7 +78,7 @@ class TorcsEnv:
         #  Simple Autnmatic Throttle Control by Snakeoil
         if self.throttle is False:
             target_speed = self.default_speed
-            if client.S.d['speedX'] < target_speed - (client.R.d['steer']*50):
+            if client.ServerState.data['speedX'] < target_speed - (client.R.d['steer'] * 50):
                 client.R.d['accel'] += .01
             else:
                 client.R.d['accel'] -= .01
@@ -86,12 +86,12 @@ class TorcsEnv:
             if client.R.d['accel'] > 0.2:
                 client.R.d['accel'] = 0.2
 
-            if client.S.d['speedX'] < 10:
-                client.R.d['accel'] += 1/(client.S.d['speedX']+.1)
+            if client.ServerState.data['speedX'] < 10:
+                client.R.d['accel'] += 1/(client.ServerState.data['speedX'] + .1)
 
             # Traction Control System
-            if ((client.S.d['wheelSpinVel'][2]+client.S.d['wheelSpinVel'][3]) -
-               (client.S.d['wheelSpinVel'][0]+client.S.d['wheelSpinVel'][1]) > 5):
+            if ((client.ServerState.data['wheelSpinVel'][2] + client.ServerState.data['wheelSpinVel'][3]) -
+               (client.ServerState.data['wheelSpinVel'][0] + client.ServerState.data['wheelSpinVel'][1]) > 5):
                 action_torcs['accel'] -= .2
         else:
             action_torcs['accel'] = this_action['accel']
@@ -116,7 +116,7 @@ class TorcsEnv:
             """
 
         # Save the privious full-obs from torcs for the reward calculation
-        obs_pre = copy.deepcopy(client.S.d)
+        obs_pre = copy.deepcopy(client.ServerState.data)
 
         # One-Step Dynamics Update #################################
         # Apply the Agent's action into torcs
@@ -125,7 +125,7 @@ class TorcsEnv:
         client.get_servers_input()
 
         # Get the current full-observation from torcs
-        obs = client.S.d
+        obs = client.ServerState.data
 
         # Make an obsevation from a raw observation vector from TORCS
         self.observation = self.make_observaton(obs)
@@ -187,7 +187,7 @@ class TorcsEnv:
         client = self.client
         client.get_servers_input()  # Get the initial input from torcs
 
-        obs = client.S.d  # Get the current full-observation from torcs
+        obs = client.ServerState.data  # Get the current full-observation from torcs
         self.observation = self.make_observaton(obs)
 
         self.last_u = None
@@ -281,18 +281,33 @@ class TorcsEnv:
                                img=image_rgb)
 
 
-        def new_episode():
-            """Initiates a new episode."""
-            pass
+    def new_episode(self):
+        """Initiates a new episode."""
+        self.reset(relaunch=False)  # TODO Will need to reset to overcome memory leak.
 
-        def get_state():
-            """Returns the current screen capture."""
-            pass
+    def get_state(self):
+        """Returns the current screen capture."""
+        ob=self.make_observaton(self.client.ServerState.data)
+        return ob[-1]
 
-        def is_episode_finished():
-            """Returns a boolean value indicating whether an episode is finished or not."""
-            pass
 
-        def make_action():
-            """Executes an action in the environment, returns a reward."""
-            pass
+    def is_episode_finished(self):
+        # Going backwards, crashed, time limit exceeded.
+        """Returns a boolean value indicating whether an episode is finished or not."""
+
+        obs = self.client.ServerState.data
+        track = np.array(obs['track'])
+        sp = np.array(obs['speedX'])
+        progress = sp*np.cos(obs['angle'])
+
+        # Finished if: Off the track, going backwards or not enough progress.
+        return track.min() < 0 or np.cos(obs['angle']) < 0 or ((self.terminal_judge_start < self.time_step) and (progress < self.termination_limit_progress))
+
+    def make_action(self,action):
+        """Executes an action in the environment, returns a reward."""
+        nextAction=self.agent_to_torcs(action)
+        self.client.R.d['steer']=nextAction['steer']
+        self.client.respond_to_server()
+        # self.get_obs(), reward, client.R.d['meta'], {}
+        return self.make_observaton(),-1,self.client.R.d['meta'], {}
+        #return self.step(action)
