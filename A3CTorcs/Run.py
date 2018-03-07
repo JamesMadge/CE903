@@ -7,6 +7,7 @@ import tensorflow as tf
 from A3CNetwork import A3CNetwork
 from Worker import Worker
 from vizdoom import *
+from gym_torcs import *
 print('# Initialising variables ...')
 
 load_model = False
@@ -18,14 +19,15 @@ cpu_identifier = "/cpu:0"  # The CPU of the machine.
 gpu_0_identifier = "/device:GPU:0"  # The GPU of the machine machine (if available).
 gpu_1_identifier = "/device:GPU:1"  # The second GPU of the machine machine (if available).
 
-cpu_count = multiprocessing.cpu_count()  # Available CPU threads.
+#cpu_count = multiprocessing.cpu_count()  # Available CPU threads.
+cpu_count =1
 print(str(cpu_count))
 
 learning_rate = 1e-4
 gamma = 0.99  # Discount rate for advantage estimation and reward discounting.
 
-input_size = 7056  # Number of inputs. # TODO
-action_size = 3  # Number of actions that can be taken. # TODO
+input_size = 4096  # Number of inputs. # TODO
+action_size = 1  # Number of actions that can be taken. # TODO
 
 # Worker agents represented by their own neural network, with their own network parameters and acting within their own
 # environment at the same time the other agents are acting in theirs
@@ -55,7 +57,7 @@ with tf.device(cpu_identifier):
 
     # Create worker for each CPU thread.
     for cpu in range(cpu_count):
-        workers.append(Worker(DoomGame(), cpu, input_size, action_size, optimizer, model_path, global_episodes))
+        workers.append(Worker(TorcsEnv(vision=True), cpu, input_size, action_size, optimizer, model_path, global_episodes))
     saver = tf.train.Saver(max_to_keep=checkpoints_to_keep)
 
 with tf.Session() as sess:

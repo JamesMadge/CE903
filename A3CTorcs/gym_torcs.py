@@ -16,6 +16,7 @@ class TorcsEnv:
     default_speed = 50
 
     initial_reset = True
+    file=open("ActionResults.txt","w")
 
 
     def __init__(self, vision=False, throttle=False, gear_change=False):
@@ -297,11 +298,13 @@ class TorcsEnv:
 
         obs = self.client.ServerState.data
         track = np.array(obs['track'])
-        sp = np.array(obs['speedX'])
+        sp = obs['speedX']
         progress = sp*np.cos(obs['angle'])
-
+        episodeFinished = track.min() < 0 or np.cos(obs['angle']) < 0 or\
+                          ((self.terminal_judge_start < self.time_step) and (progress < self.termination_limit_progress))
+        self.file.write("Episode finished: "+str(episodeFinished)+ "\n")
         # Finished if: Off the track, going backwards or not enough progress.
-        return track.min() < 0 or np.cos(obs['angle']) < 0 or ((self.terminal_judge_start < self.time_step) and (progress < self.termination_limit_progress))
+        return episodeFinished
 
     def make_action(self,action):
         """Executes an action in the environment, returns a reward."""
@@ -313,9 +316,9 @@ class TorcsEnv:
         self.observation=self.make_observaton(self.client.ServerState.data)
         newObs=self.client.ServerState.data
 
-
-        sp = np.array(newObs["speedX"])
+        sp = newObs['speedX']
         progress = sp * np.cos(newObs['angle'])
         reward = progress
+        self.file.write("Reward: "+str(reward)+"\n")
         return reward
 

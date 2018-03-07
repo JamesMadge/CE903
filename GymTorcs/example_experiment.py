@@ -31,7 +31,11 @@ for i in range(episode_count):
         action = agent.act(ob, reward, done, vision)
         env.get_state()
         print(env.client.port)
-        ob, reward, done, _ = env.make_action(action)
+        #ob, reward, done, _ =
+
+        # env.step(action)
+        reward=env.make_action(action
+                               )
         #print(ob.keys())
         total_reward += reward
 

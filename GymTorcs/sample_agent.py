@@ -8,6 +8,7 @@ class Agent(object):
     def act(self, ob, reward, done, vision_on):
         #print("ACT!")
 
+
         # Get an Observation from the environment.
         # Each observation vectors are numpy array.
         # focus, opponents, track sensors are scaled into [0, 1]. When the agent
@@ -24,14 +25,31 @@ class Agent(object):
                 So you may need to remove.
             """
             print(vision.shape)
-            
-            img = np.ndarray((64,64,3))
-            for i in range(3):
-                img[:, :, i] = 255 - vision[:, i].reshape((64, 64))
 
-            plt.imshow(img, origin='lower')
+            img=rgb2grey(vision)
+
+            #plt.imshow(img, origin='lower')
+            plt.imshow(img, cmap=plt.get_cmap('gray'), origin='lower')
             plt.draw()
             plt.pause(0.001)
 
         #return np.tanh(np.random.randn(self.dim_action)) # random action
         return np.array([1])
+
+# def rgb2grey(vision):
+#     img = np.ndarray((64, 64, 3))
+#     for i in range(3):
+#         img[:, :, i] = 255 - vision[:, i].reshape((64, 64))
+#
+#     #img=np.array([2,64])
+#     avgGray=(np.dot(img[...,:3],[0.333,0.333,0.333]))
+#     lum=(np.dot(img[...,:3],[0.299,0.717,0.114]))
+#     #return avgGray
+#     return lum
+
+def rgb2grey(vision):
+    img = np.ndarray((64, 64, 3))
+    for i in range(3):
+        img[:, :, i] = 255 - vision[:, i].reshape((64, 64))
+    lum=(np.dot(img[...,:3],[0.299,0.717,0.114]))
+    return lum

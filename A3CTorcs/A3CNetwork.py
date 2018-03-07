@@ -10,7 +10,7 @@ class A3CNetwork:
         with tf.variable_scope(scope):
             # Input and visual encoding layers
             self.inputs = tf.placeholder(shape=[None, s_size], dtype=tf.float32)
-            self.imageIn = tf.reshape(self.inputs, shape=[-1, 84, 84, 1])
+            self.imageIn = tf.reshape(self.inputs, shape=[-1, 64, 64, 1])
             self.conv1 = slim.conv2d(activation_fn=tf.nn.elu,
                                      inputs=self.imageIn, num_outputs=16,
                                      kernel_size=[8, 8], stride=[4, 4], padding='VALID')
@@ -39,7 +39,7 @@ class A3CNetwork:
 
             # Output layers for policy and value estimations
             self.policy = slim.fully_connected(rnn_out, a_size,
-                                               activation_fn=tf.nn.softmax,
+                                               activation_fn=tf.nn.tanh,
                                                weights_initializer=normalized_columns_initializer(0.01),
                                                biases_initializer=None)
             self.value = slim.fully_connected(rnn_out, 1,

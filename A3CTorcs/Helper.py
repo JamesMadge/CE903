@@ -22,7 +22,8 @@ def process_frame(frame):
     s = np.reshape(s, [np.prod(s.shape)]) / 255.0
     return s
 
-
+def reScale(img):
+    return scipy.misc.imresize(img,[84,84])
 # Discounting function used to calculate discounted returns.
 def discount(x, gamma):
     return scipy.signal.lfilter([1], [1, -gamma], x[::-1], axis=0)[::-1]
@@ -69,3 +70,22 @@ def make_gif(images, fname, duration=2, true_image=False, salience=False, salIMG
         # clipB.write_gif(fname, fps = len(images) / duration,verbose=False)
     else:
         clip.write_gif(fname, fps=len(images) / duration, verbose=False)
+
+# def rgb2grey(img):
+#     img=np.array([2,64])
+#     avgGray=(np.dot(img[...,:3],[0.333,0.333,0.333]))
+#     img = np.ndarray((64, 64, 3))
+#     for i in range(3):
+#         img[:, :, i] = 255 - vision[:, i].reshape((64, 64))
+#     lum=(np.dot(img[...,:3],[0.299,0.717,0.114]))
+#     lum = np.reshape(lum, [np.prod(lum.shape)])
+#     #return avgGray
+#     return lum
+
+def rgb2grey(vision):
+    img = np.ndarray((64, 64, 3))
+    for i in range(3):
+        img[:, :, i] = 255 - vision[:, i].reshape((64, 64))
+    lum=(np.dot(img[...,:3],[0.299,0.717,0.114]))
+    tf_img = np.reshape(lum, [np.prod(lum.shape)]) / 255.0
+    return tf_img
