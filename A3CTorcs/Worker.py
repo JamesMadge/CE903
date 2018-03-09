@@ -2,11 +2,9 @@ import tensorflow as tf
 import numpy as np
 
 from A3CNetwork import A3CNetwork
-from Helper import update_target_graph, discount, process_frame, make_gif
-#from vizdoom import *
-import gym_torcs
-from Helper import *
-
+from Helper import update_target_graph, discount, process_frame, make_gif, rgb2grey
+from vizdoom import *
+from gym_torcs import TorcsEnv
 class Worker:
     def __init__(self, game, name, s_size, a_size, trainer, model_path, global_episodes):
         self.name = "worker_" + str(name)
@@ -39,17 +37,17 @@ class Worker:
         self.update_local_ops = update_target_graph('global', self.name)
 
         # # The Below code is related to setting up the Doom environment
-        #game.set_doom_scenario_path("basic.wad")  # This corresponds to the simple task we will pose our agent
-        #game.set_doom_map("map01")
-        #game.set_screen_resolution(ScreenResolution.RES_160X120)
-        #game.set_screen_format(ScreenFormat.GRAY8)
-        #game.set_render_hud(False)
-        #game.set_render_crosshair(False)
-        #game.set_render_weapon(True)
-        #game.set_render_decals(False)
-        #game.set_render_particles(False)
-        #game.add_available_button(Button.MOVE_LEFT)
-        #game.add_available_button(Button.MOVE_RIGHT)
+        # game.set_doom_scenario_path("basic.wad")  # This corresponds to the simple task we will pose our agent
+        # game.set_doom_map("map01")
+        # game.set_screen_resolution(ScreenResolution.RES_160X120)
+        # #game.set_screen_format(ScreenFormat.GRAY8)
+        # game.set_render_hud(False)
+        # game.set_render_crosshair(False)
+        # game.set_render_weapon(True)
+        # game.set_render_decals(False)
+        # game.set_render_particles(False)
+        # game.add_available_button(Button.MOVE_LEFT)
+        # game.add_available_button(Button.MOVE_RIGHT)
         # game.add_available_button(Button.ATTACK)
         # game.add_available_game_variable(GameVariable.AMMO2)
         # game.add_available_game_variable(GameVariable.POSITION_X)
@@ -116,38 +114,38 @@ class Worker:
                 d = False
 
                 self.env.new_episode()
-                frame = rgb2grey(self.env.get_state())
-
-                episode_frames.append(frame)
-                #frame = process_frame(frame)
+                s = self.env.get_state()
+                s = rgb2grey(s)
+                episode_frames.append(s)  # Grey frame for presentation.
+                s = process_frame(s)      # Cropped and normalised grey frame for network.
                 rnn_state = self.local_AC.state_init
                 self.batch_rnn_state = rnn_state
                 while self.env.is_episode_finished() == False:
                     # Take an action using probabilities from policy network output.
-                    a, v, rnn_state = sess.run(
+                    a_dist, v, rnn_state = sess.run(
                         [self.local_AC.policy, self.local_AC.value, self.local_AC.state_out],
-                        feed_dict={self.local_AC.inputs: [frame],
+                        feed_dict={self.local_AC.inputs: [s],
                                    self.local_AC.state_in[0]: rnn_state[0],
                                    self.local_AC.state_in[1]: rnn_state[1]})
                     #a = np.random.choice(a_dist[0], p=a_dist[0])
-                    # np.argmax returns index of first True value while iterating.
                     #a = np.argmax(a_dist == a)
-                    #r = self.env.make_action(self.actions[a])/ 100.0
+                    a = a_dist[0]
+                    #r = self.env.make_action(self.actions[a]) / 100.0
                     r = self.env.make_action(a)
                     d = self.env.is_episode_finished()
                     if d == False:
-                        s1 =rgb2grey(self.env.get_state())
+                        s1 = self.env.get_state()
+                        s1 = rgb2grey(s1)
                         episode_frames.append(s1)
-                        #s1 = process_frame(s1)
-
+                        s1 = process_frame(s1)
                     else:
-                        s1 = frame
+                        s1 = s
 
-                    episode_buffer.append([frame, a, r, s1, d, v[0, 0]])
+                    episode_buffer.append([s, a, r, s1, d, v[0, 0]])
                     episode_values.append(v[0, 0])
 
                     episode_reward += r
-                    frame = s1
+                    s = s1
                     total_steps += 1
                     episode_step_count += 1
 
@@ -157,7 +155,7 @@ class Worker:
                         # Since we don't know what the true final return is, we "bootstrap" from our current
                         # value estimation.
                         v1 = sess.run(self.local_AC.value,
-                                      feed_dict={self.local_AC.inputs:[frame],
+                                      feed_dict={self.local_AC.inputs: [s],
                                                  self.local_AC.state_in[0]: rnn_state[0],
                                                  self.local_AC.state_in[1]: rnn_state[1]})[0, 0]
                         v_l, p_l, e_l, g_n, v_n = self.train(episode_buffer, sess, gamma, v1)
@@ -166,7 +164,7 @@ class Worker:
                     if d == True:
                         break
 
-                print("Worker ID:%frame Episode Count:%d " % (self.name, episode_count))
+                print("Worker ID:%s Episode Count:%d " % (self.name, episode_count))
                 self.episode_rewards.append(episode_reward)
                 self.episode_lengths.append(episode_step_count)
                 self.episode_mean_values.append(np.mean(episode_values))

@@ -289,25 +289,37 @@ class TorcsEnv:
     def get_state(self):
         """Returns the current screen capture."""
         ob=self.make_observaton(self.client.ServerState.data)
-        return ob[-1]
+
+
+
+
+        return ob.img
 
 
     def is_episode_finished(self):
         # Going backwards, crashed, time limit exceeded.
         """Returns a boolean value indicating whether an episode is finished or not."""
-
+        self.client.get_servers_input()
         obs = self.client.ServerState.data
         track = np.array(obs['track'])
         sp = obs['speedX']
         progress = sp*np.cos(obs['angle'])
-        episodeFinished = track.min() < 0 or np.cos(obs['angle']) < 0 or\
-                          ((self.terminal_judge_start < self.time_step) and (progress < self.termination_limit_progress))
+
+        off_track = track.min() < 0
+        going_backwards = np.cos(obs['angle']) < 0
+        not_making_progress = ((self.terminal_judge_start < self.time_step) and (progress < self.termination_limit_progress))
+
+        episodeFinished = off_track or going_backwards or not_making_progress
+
         self.file.write("Episode finished: "+str(episodeFinished)+ "\n")
-        # Finished if: Off the track, going backwards or not enough progress.
+        self.file.write("Track: "+str(track)+ "\n")
+
         return episodeFinished
 
     def make_action(self,action):
         """Executes an action in the environment, returns a reward."""
+
+        print('Action: ', action)
         nextAction=self.agent_to_torcs(action)
         self.client.R.d['steer']=nextAction['steer']
         oldObs = self.make_observaton(self.client.ServerState.data) #saving previous observation

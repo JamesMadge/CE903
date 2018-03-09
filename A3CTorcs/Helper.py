@@ -2,7 +2,8 @@ import tensorflow as tf
 import numpy as np
 import scipy.signal
 import moviepy.editor as mpy
-
+# from skimage.color import rgb2grey
+from matplotlib import pyplot as plt
 # Copies one set of variables to another.
 # Used to set worker network parameters to those of global network.
 def update_target_graph(from_scope, to_scope):
@@ -17,14 +18,17 @@ def update_target_graph(from_scope, to_scope):
 
 # Processes Doom screen image to produce cropped and resized image.
 def process_frame(frame):
-    s = frame[10:-10, 30:-30]
-    s = scipy.misc.imresize(s, [84, 84])
-    s = np.reshape(s, [np.prod(s.shape)]) / 255.0
+    #s = frame[10:-10, 30:-30]
+    #s = scipy.misc.imresize(s, [64, 64])  #TODO CHANGED For resizing.
+    s = np.reshape(frame, [np.prod(frame.shape)]) / 255.0
     return s
 
-def reScale(img):
-    return scipy.misc.imresize(img,[84,84])
+
 # Discounting function used to calculate discounted returns.
+def reScale(img):
+    return scipy.misc.imresize(img, [84, 84])
+
+
 def discount(x, gamma):
     return scipy.signal.lfilter([1], [1, -gamma], x[::-1], axis=0)[::-1]
 
@@ -41,7 +45,6 @@ def normalized_columns_initializer(std=1.0):
 
 # This code allows gifs to be saved of the training episode for use in the Control Center.
 def make_gif(images, fname, duration=2, true_image=False, salience=False, salIMGS=None):
-
     def make_frame(t):
         try:
             x = images[int(len(images) / duration * t)]
@@ -71,6 +74,7 @@ def make_gif(images, fname, duration=2, true_image=False, salience=False, salIMG
     else:
         clip.write_gif(fname, fps=len(images) / duration, verbose=False)
 
+
 # def rgb2grey(img):
 #     img=np.array([2,64])
 #     avgGray=(np.dot(img[...,:3],[0.333,0.333,0.333]))
@@ -83,9 +87,27 @@ def make_gif(images, fname, duration=2, true_image=False, salience=False, salIMG
 #     return lum
 
 def rgb2grey(vision):
+
+    img_grey = np.ndarray([64, 64])
+    vision=torcsImage(vision)
+    for i in range(3):
+        img_grey += vision[:, :, i]
+    img_grey = img_grey / 3
+
+    img_grey = np.round(img_grey, 0)
+    np.clip(img_grey, 0, 255, out=img_grey)
+    img_grey = img_grey.astype('uint8')
+
+    return img_grey    # # [x, y, z]
+    # vision=vision.reshape(160,120,3)
+    # lum = np.dot((vision[:,:,:3]),[0.299, 0.717, 0.114])
+    # return lum
+def torcsImage(vision):
     img = np.ndarray((64, 64, 3))
     for i in range(3):
-        img[:, :, i] = 255 - vision[:, i].reshape((64, 64))
-    lum=(np.dot(img[...,:3],[0.299,0.717,0.114]))
-    tf_img = np.reshape(lum, [np.prod(lum.shape)]) / 255.0
-    return tf_img
+        img[:, :, i] =vision[:, i].reshape((64, 64))
+    img=img[::-1]
+    '''plt.imshow(img)
+    plt.draw();
+    plt.pause(0.01)'''
+    return img

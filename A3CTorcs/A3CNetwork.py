@@ -39,7 +39,8 @@ class A3CNetwork:
 
             # Output layers for policy and value estimations
             self.policy = slim.fully_connected(rnn_out, a_size,
-                                               activation_fn=tf.nn.tanh,
+                                               #activation_fn=tf.nn.softmax,
+                                               activation_fn=tf.nn.tanh, #TODO Changed.
                                                weights_initializer=normalized_columns_initializer(0.01),
                                                biases_initializer=None)
             self.value = slim.fully_connected(rnn_out, 1,
@@ -49,17 +50,20 @@ class A3CNetwork:
 
             # Only the worker network need ops for loss functions and gradient updating.
             if scope != 'global':
-                self.actions = tf.placeholder(shape=[None], dtype=tf.int32)
-                self.actions_onehot = tf.one_hot(self.actions, a_size, dtype=tf.float32)
+                self.actions = tf.placeholder(shape=[None], dtype=tf.float32)
+                # self.actions_onehot = tf.one_hot(self.actions, a_size, dtype=tf.float32)
+                #self.actions_steering = tf.placeholder(shape=[None], dtype=tf.float32)  # TODO Changed.
                 self.target_v = tf.placeholder(shape=[None], dtype=tf.float32)
                 self.advantages = tf.placeholder(shape=[None], dtype=tf.float32)
-
-                self.responsible_outputs = tf.reduce_sum(self.policy * self.actions_onehot, [1])
+                #steering=tf.Tensor.eval(self.actions)
+                #self.responsible_outputs = tf.reduce_sum(self.policy * self.actions_onehot, [1])
+                #self.responsible_outputs = tf.reduce_sum(self.policy * self.actions_steering, [1])  # TODO Changed.
 
                 # Loss functions
                 self.value_loss = 0.5 * tf.reduce_sum(tf.square(self.target_v - tf.reshape(self.value, [-1])))
                 self.entropy = - tf.reduce_sum(self.policy * tf.log(self.policy))
-                self.policy_loss = -tf.reduce_sum(tf.log(self.responsible_outputs) * self.advantages)
+                #self.policy_loss = -tf.reduce_sum(tf.log(self.responsible_outputs) * self.advantages)
+                self.policy_loss = -tf.reduce_sum(tf.log(self.actions) * self.advantages)
                 self.loss = 0.5 * self.value_loss + self.policy_loss - self.entropy * 0.01
 
                 # Get gradients from local network using local losses

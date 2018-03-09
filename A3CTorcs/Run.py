@@ -7,7 +7,8 @@ import tensorflow as tf
 from A3CNetwork import A3CNetwork
 from Worker import Worker
 from vizdoom import *
-from gym_torcs import *
+from gym_torcs import TorcsEnv
+
 print('# Initialising variables ...')
 
 load_model = False
@@ -20,7 +21,7 @@ gpu_0_identifier = "/device:GPU:0"  # The GPU of the machine machine (if availab
 gpu_1_identifier = "/device:GPU:1"  # The second GPU of the machine machine (if available).
 
 #cpu_count = multiprocessing.cpu_count()  # Available CPU threads.
-cpu_count =1
+cpu_count=1
 print(str(cpu_count))
 
 learning_rate = 1e-4
@@ -36,7 +37,7 @@ workers = []
 # https://www.tensorflow.org/api_docs/python/tf/train/Saver
 checkpoints_to_keep = 5  # Maximum number of recent checkpoint files to keep.
 
-#TODO
+# TODO
 max_episode_length = 50
 
 print('# Variable initialisation complete ...')
@@ -64,8 +65,7 @@ with tf.Session() as sess:
     print('# \'with tf.session()\'')
     coord = tf.train.Coordinator()
     if load_model:
-        
-        
+
         print('Loading Model...')
         ckpt = tf.train.get_checkpoint_state(model_path)
         saver.restore(sess, ckpt.model_checkpoint_path)
