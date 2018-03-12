@@ -11,44 +11,47 @@ import time
 from matplotlib import pyplot as plt
 
 class TorcsEnv:
+
     terminal_judge_start = 500  # Speed limit is applied after this step
     termination_limit_progress = 5  # [km/h], episode terminates if car is running slower than this limit
+
     default_speed = 50
 
     initial_reset = True
-    file=open("ActionResults.txt","w")
+    file = open("ActionResults.txt", "w")
 
-
-    def __init__(self, vision=False, throttle=False, gear_change=False):
-       #print("Init")
+    def __init__(self, port, vision=False, throttle=False, gear_change=False):
+        # print("Init")
         self.vision = vision
         self.throttle = throttle
         self.gear_change = gear_change
-
+        self.port = port
         self.initial_run = True
 
         ##print("launch torcs")
-        #os.system('pkill torcs')
+        # os.system('pkill torcs')
+        '''
         time.sleep(0.5)
         if self.vision is True:
             os.system('torcs -nofuel -nodamage -nolaptime  -vision &')
         else:
-            os.system('torcs  -nofuel -nodamage -nolaptime &')
+            os.system('torcs -nofuel -nodamage -nolaptime &')
+        
         time.sleep(0.5)
         os.system('sh autostart.sh')
         time.sleep(0.5)
+        '''
 
-        
         # Modify here if you use multiple tracks in the environment
-        self.client = snakeoil3.Client(p=3101, vision=self.vision)  # Open new UDP in vtorcs
-	
+        #self.client = snakeoil3.Client(p=3101, vision=self.vision)  # Open new UDP in vtorcs
+        #self.client = snakeoil3.Client(p=self.port, vision=self.vision)  # Open new UDP in vtorcs
+        self.make_connection()
         self.client.MAX_STEPS = np.inf
 
         client = self.client
-        client.get_servers_input()  # Get the initial input from torcs
-	
+        #client.get_servers_input()  # TODO Took out. Clients waiting for server.
         obs = client.ServerState.data  # Get the current full-observation from torcs
-        self.obs=obs
+        self.obs = obs
         if throttle is False:
             self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,))
         else:
@@ -64,7 +67,7 @@ class TorcsEnv:
             self.observation_space = spaces.Box(low=low, high=high)
 
     def step(self, u):
-       #print("Step")
+        # print("Step")
         # convert thisAction to the actual torcs actionstr
         client = self.client
 
@@ -88,11 +91,11 @@ class TorcsEnv:
                 client.R.d['accel'] = 0.2
 
             if client.ServerState.data['speedX'] < 10:
-                client.R.d['accel'] += 1/(client.ServerState.data['speedX'] + .1)
+                client.R.d['accel'] += 1 / (client.ServerState.data['speedX'] + .1)
 
             # Traction Control System
             if ((client.ServerState.data['wheelSpinVel'][2] + client.ServerState.data['wheelSpinVel'][3]) -
-               (client.ServerState.data['wheelSpinVel'][0] + client.ServerState.data['wheelSpinVel'][1]) > 5):
+                    (client.ServerState.data['wheelSpinVel'][0] + client.ServerState.data['wheelSpinVel'][1]) > 5):
                 action_torcs['accel'] -= .2
         else:
             action_torcs['accel'] = this_action['accel']
@@ -135,7 +138,7 @@ class TorcsEnv:
         # direction-dependent positive reward
         track = np.array(obs['track'])
         sp = np.array(obs['speedX'])
-        progress = sp*np.cos(obs['angle'])
+        progress = sp * np.cos(obs['angle'])
         reward = progress
 
         # collision detection
@@ -149,17 +152,16 @@ class TorcsEnv:
             episode_terminate = True
             client.R.d['meta'] = True
 
-        if self.terminal_judge_start < self.time_step: # Episode terminates if the progress of agent is small
+        if self.terminal_judge_start < self.time_step:  # Episode terminates if the progress of agent is small
             if progress < self.termination_limit_progress:
                 episode_terminate = True
                 client.R.d['meta'] = True
 
-        if np.cos(obs['angle']) < 0: # Episode is terminated if the agent runs backward
+        if np.cos(obs['angle']) < 0:  # Episode is terminated if the agent runs backward
             episode_terminate = True
             client.R.d['meta'] = True
 
-
-        if client.R.d['meta'] is True: # Send a      reset signal
+        if client.R.d['meta'] is True:  # Send a      reset signal
             self.initial_run = False
             client.respond_to_server()
 
@@ -168,7 +170,7 @@ class TorcsEnv:
         return self.get_obs(), reward, client.R.d['meta'], {}
 
     def reset(self, relaunch=False):
-        #print("Reset")
+        # print("Reset")
 
         self.time_step = 0
 
@@ -182,7 +184,8 @@ class TorcsEnv:
                 print("### TORCS is RELAUNCHED ###")
 
         # Modify here if you use multiple tracks in the environment
-        self.client = snakeoil3.Client(p=3101, vision=self.vision)  # Open new UDP in vtorcs
+        self.client = snakeoil3.Client(p=self.port, vision=self.vision)  # Open new UDP in vtorcs
+        self.client.MAX_STEPS = np.inf
         self.client.MAX_STEPS = np.inf
 
         client = self.client
@@ -203,7 +206,7 @@ class TorcsEnv:
         return self.observation
 
     def reset_torcs(self):
-       #print("relaunch torcs")
+        # print("relaunch torcs")
         os.system('pkill torcs')
         time.sleep(0.5)
         if self.vision is True:
@@ -220,23 +223,22 @@ class TorcsEnv:
         if self.throttle is True:  # throttle action is enabled
             torcs_action.update({'accel': u[1]})
 
-        if self.gear_change is True: # gear change action is enabled
+        if self.gear_change is True:  # gear change action is enabled
             torcs_action.update({'gear': u[2]})
 
         return torcs_action
 
-
     def obs_vision_to_image_rgb(self, obs_image_vec):
-        image_vec =  obs_image_vec
+        image_vec = obs_image_vec
         rgb = []
         temp = []
         # convert size 64x64x3 = 12288 to 64x64=4096 2-D list 
         # with rgb values grouped together.
         # Format similar to the observation in openai gym
-        for i in range(0,12286,3):
+        for i in range(0, 12286, 3):
             temp.append(image_vec[i])
-            temp.append(image_vec[i+1])
-            temp.append(image_vec[i+2])
+            temp.append(image_vec[i + 1])
+            temp.append(image_vec[i + 2])
             rgb.append(temp)
             temp = []
         return np.array(rgb, dtype=np.uint8)
@@ -250,13 +252,13 @@ class TorcsEnv:
                      'track',
                      'wheelSpinVel']
             Observation = col.namedtuple('Observaion', names)
-            return Observation(focus=np.array(raw_obs['focus'], dtype=np.float32)/200.,
-                               speedX=np.array(raw_obs['speedX'], dtype=np.float32)/self.default_speed,
-                               speedY=np.array(raw_obs['speedY'], dtype=np.float32)/self.default_speed,
-                               speedZ=np.array(raw_obs['speedZ'], dtype=np.float32)/self.default_speed,
-                               opponents=np.array(raw_obs['opponents'], dtype=np.float32)/200.,
+            return Observation(focus=np.array(raw_obs['focus'], dtype=np.float32) / 200.,
+                               speedX=np.array(raw_obs['speedX'], dtype=np.float32) / self.default_speed,
+                               speedY=np.array(raw_obs['speedY'], dtype=np.float32) / self.default_speed,
+                               speedZ=np.array(raw_obs['speedZ'], dtype=np.float32) / self.default_speed,
+                               opponents=np.array(raw_obs['opponents'], dtype=np.float32) / 200.,
                                rpm=np.array(raw_obs['rpm'], dtype=np.float32),
-                               track=np.array(raw_obs['track'], dtype=np.float32)/200.,
+                               track=np.array(raw_obs['track'], dtype=np.float32) / 200.,
                                wheelSpinVel=np.array(raw_obs['wheelSpinVel'], dtype=np.float32))
         else:
             names = ['focus',
@@ -271,16 +273,15 @@ class TorcsEnv:
             # Get RGB from observation
             image_rgb = self.obs_vision_to_image_rgb(raw_obs[names[8]])
 
-            return Observation(focus=np.array(raw_obs['focus'], dtype=np.float32)/200.,
-                               speedX=np.array(raw_obs['speedX'], dtype=np.float32)/self.default_speed,
-                               speedY=np.array(raw_obs['speedY'], dtype=np.float32)/self.default_speed,
-                               speedZ=np.array(raw_obs['speedZ'], dtype=np.float32)/self.default_speed,
-                               opponents=np.array(raw_obs['opponents'], dtype=np.float32)/200.,
+            return Observation(focus=np.array(raw_obs['focus'], dtype=np.float32) / 200.,
+                               speedX=np.array(raw_obs['speedX'], dtype=np.float32) / self.default_speed,
+                               speedY=np.array(raw_obs['speedY'], dtype=np.float32) / self.default_speed,
+                               speedZ=np.array(raw_obs['speedZ'], dtype=np.float32) / self.default_speed,
+                               opponents=np.array(raw_obs['opponents'], dtype=np.float32) / 200.,
                                rpm=np.array(raw_obs['rpm'], dtype=np.float32),
-                               track=np.array(raw_obs['track'], dtype=np.float32)/200.,
+                               track=np.array(raw_obs['track'], dtype=np.float32) / 200.,
                                wheelSpinVel=np.array(raw_obs['wheelSpinVel'], dtype=np.float32),
                                img=image_rgb)
-
 
     def new_episode(self):
         """Initiates a new episode."""
@@ -288,13 +289,9 @@ class TorcsEnv:
 
     def get_state(self):
         """Returns the current screen capture."""
-        ob=self.make_observaton(self.client.ServerState.data)
-
-
-
+        ob = self.make_observaton(self.client.ServerState.data)
 
         return ob.img
-
 
     def is_episode_finished(self):
         # Going backwards, crashed, time limit exceeded.
@@ -303,34 +300,36 @@ class TorcsEnv:
         obs = self.client.ServerState.data
         track = np.array(obs['track'])
         sp = obs['speedX']
-        progress = sp*np.cos(obs['angle'])
+        progress = sp * np.cos(obs['angle'])
 
         off_track = track.min() < 0
         going_backwards = np.cos(obs['angle']) < 0
-        not_making_progress = ((self.terminal_judge_start < self.time_step) and (progress < self.termination_limit_progress))
+        not_making_progress = (
+                    (self.terminal_judge_start < self.time_step) and (progress < self.termination_limit_progress))
 
         episodeFinished = off_track or going_backwards or not_making_progress
 
-        self.file.write("Episode finished: "+str(episodeFinished)+ "\n")
-        self.file.write("Track: "+str(track)+ "\n")
+        self.file.write("Episode finished: " + str(episodeFinished) + "\n")
+        self.file.write("Track: " + str(track) + "\n")
 
         return episodeFinished
 
-    def make_action(self,action):
+    def make_action(self, action):
         """Executes an action in the environment, returns a reward."""
 
         print('Action: ', action)
-        nextAction=self.agent_to_torcs(action)
-        self.client.R.d['steer']=nextAction['steer']
-        oldObs = self.make_observaton(self.client.ServerState.data) #saving previous observation
+        nextAction = self.agent_to_torcs(action)
+        self.client.R.d['steer'] = nextAction['steer']
+        oldObs = self.make_observaton(self.client.ServerState.data)  # saving previous observation
 
         self.client.respond_to_server()
-        self.observation=self.make_observaton(self.client.ServerState.data)
-        newObs=self.client.ServerState.data
+        self.observation = self.make_observaton(self.client.ServerState.data)
+        newObs = self.client.ServerState.data
 
         sp = newObs['speedX']
         progress = sp * np.cos(newObs['angle'])
         reward = progress
-        self.file.write("Reward: "+str(reward)+"\n")
+        self.file.write("Reward: " + str(reward) + "\n")
         return reward
-
+    def make_connection(self):
+        self.client = snakeoil3.Client(p=self.port, vision=self.vision)  # Open new UDP in vtorcs

@@ -1,6 +1,7 @@
 import threading
 import multiprocessing
 import os.path
+import time
 from time import sleep
 import tensorflow as tf
 
@@ -12,6 +13,7 @@ from gym_torcs import TorcsEnv
 print('# Initialising variables ...')
 
 load_model = False
+
 model_path = './model'
 
 # TensorFlow supports both CPU and GPU, as identified below.
@@ -20,9 +22,12 @@ cpu_identifier = "/cpu:0"  # The CPU of the machine.
 gpu_0_identifier = "/device:GPU:0"  # The GPU of the machine machine (if available).
 gpu_1_identifier = "/device:GPU:1"  # The second GPU of the machine machine (if available).
 
-#cpu_count = multiprocessing.cpu_count()  # Available CPU threads.
-cpu_count=1
+
+# cpu_count = multiprocessing.cpu_count()  # Available CPU threads.
+cpu_count=2
 print(str(cpu_count))
+
+port_base = 3101
 
 learning_rate = 1e-4
 gamma = 0.99  # Discount rate for advantage estimation and reward discounting.
@@ -57,8 +62,16 @@ with tf.device(cpu_identifier):
     master_network = A3CNetwork(input_size, action_size, 'global', None)  # Create global network.
 
     # Create worker for each CPU thread.
+    # Start one instances of Torcs
+    os.system('torcs -nofuel -nodamage -nolaptime  -vision &')
+    time.sleep(0.5)
+    #Do autostart into Training
+    os.system('sh autostart.sh')
+    time.sleep(0.5)
     for cpu in range(cpu_count):
-        workers.append(Worker(TorcsEnv(vision=True), cpu, input_size, action_size, optimizer, model_path, global_episodes))
+        workers.append(Worker(TorcsEnv(port=port_base, vision=True), cpu, input_size, action_size, optimizer, model_path, global_episodes))
+
+        port_base += 1
     saver = tf.train.Saver(max_to_keep=checkpoints_to_keep)
 
 with tf.Session() as sess:
@@ -74,6 +87,8 @@ with tf.Session() as sess:
 
     # This is where the asynchronous magic happens.
     # Start the "work" process for each worker in a separate threat.
+
+
     worker_threads = []
     for worker in workers:
         worker_work = lambda: worker.work(max_episode_length, gamma, sess, coord, saver)

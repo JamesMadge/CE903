@@ -5,7 +5,11 @@ from A3CNetwork import A3CNetwork
 from Helper import update_target_graph, discount, process_frame, make_gif, rgb2grey
 from vizdoom import *
 from gym_torcs import TorcsEnv
+
+
 class Worker:
+    active_envs=2
+    env_relaunched=False
     def __init__(self, game, name, s_size, a_size, trainer, model_path, global_episodes):
         self.name = "worker_" + str(name)
         self.number = name
@@ -113,11 +117,21 @@ class Worker:
                 episode_step_count = 0
                 d = False
 
-                self.env.new_episode()
+                if(episode_count<1):
+                    self.env.new_episode()
+
+                if Worker.active_envs<1:
+                    self.env.new_episode()
+                    Worker.env_relaunched=True
+                else:
+                    while not Worker.env_relaunched and episode_count>0:
+                        pass
+                    self.env.make_connection()
+                    Worker.env_relaunched=False
                 s = self.env.get_state()
                 s = rgb2grey(s)
                 episode_frames.append(s)  # Grey frame for presentation.
-                s = process_frame(s)      # Cropped and normalised grey frame for network.
+                s = process_frame(s)  # Cropped and normalised grey frame for network.
                 rnn_state = self.local_AC.state_init
                 self.batch_rnn_state = rnn_state
                 while self.env.is_episode_finished() == False:
@@ -127,10 +141,10 @@ class Worker:
                         feed_dict={self.local_AC.inputs: [s],
                                    self.local_AC.state_in[0]: rnn_state[0],
                                    self.local_AC.state_in[1]: rnn_state[1]})
-                    #a = np.random.choice(a_dist[0], p=a_dist[0])
-                    #a = np.argmax(a_dist == a)
+                    # a = np.random.choice(a_dist[0], p=a_dist[0])
+                    # a = np.argmax(a_dist == a)
                     a = a_dist[0]
-                    #r = self.env.make_action(self.actions[a]) / 100.0
+                    # r = self.env.make_action(self.actions[a]) / 100.0
                     r = self.env.make_action(a)
                     d = self.env.is_episode_finished()
                     if d == False:
@@ -164,6 +178,8 @@ class Worker:
                     if d == True:
                         break
 
+                # TODO Worker finished their episode.
+
                 print("Worker ID:%s Episode Count:%d " % (self.name, episode_count))
                 self.episode_rewards.append(episode_reward)
                 self.episode_lengths.append(episode_step_count)
@@ -173,12 +189,14 @@ class Worker:
                 if len(episode_buffer) != 0:
                     v_l, p_l, e_l, g_n, v_n = self.train(episode_buffer, sess, gamma, 0.0)
 
+
                 # Periodically save gifs of episodes, model parameters, and summary statistics.
                 if episode_count % 5 == 0 and episode_count != 0:
                     if self.name == 'worker_0' and episode_count % 25 == 0:
                         time_per_step = 0.05
                         images = np.array(episode_frames)
-                        make_gif(images, './frames/image' + str(episode_count) + '.gif',duration=len(images) * time_per_step, true_image=True, salience=False)
+                        make_gif(images, './frames/image' + str(episode_count) + '.gif',
+                                 duration=len(images) * time_per_step, true_image=True, salience=False)
                     if episode_count % 250 == 0 and self.name == 'worker_0':
                         saver.save(sess, self.model_path + '/model-' + str(episode_count) + '.cptk')
                         print("Saved Model")
@@ -201,3 +219,6 @@ class Worker:
                 if self.name == 'worker_0':
                     sess.run(self.increment)
                 episode_count += 1
+
+                #Decrement active_env if dead
+                Worker.active_envs-=1
