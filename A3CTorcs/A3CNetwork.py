@@ -41,7 +41,7 @@ class A3CNetwork:
             self.policy = slim.fully_connected(rnn_out, a_size,
                                                #activation_fn=tf.nn.softmax,
                                                activation_fn=tf.nn.tanh, #TODO Changed.
-                                               weights_initializer=normalized_columns_initializer(0.01),
+                                               weights_initializer=normalized_columns_initializer(0.1),
                                                biases_initializer=None)
             self.value = slim.fully_connected(rnn_out, 1,
                                               activation_fn=None,

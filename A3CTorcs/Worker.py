@@ -3,7 +3,7 @@ import numpy as np
 
 from A3CNetwork import A3CNetwork
 from Helper import update_target_graph, discount, process_frame, make_gif, rgb2grey
-#from vizdoom import *
+from vizdoom import *
 from gym_torcs import TorcsEnv
 class Worker:
     def __init__(self, game, name, s_size, a_size, trainer, model_path, global_episodes):
@@ -127,9 +127,8 @@ class Worker:
                         feed_dict={self.local_AC.inputs: [s],
                                    self.local_AC.state_in[0]: rnn_state[0],
                                    self.local_AC.state_in[1]: rnn_state[1]})
-                    #a = np.random.choice(a_dist[0], p=a_dist[0])
-                    #a = np.argmax(a_dist == a)
                     a = a_dist[0]
+                    a = (np.random.uniform(low=-1,high=1,size=1)) if np.isnan(a) else a
                     #r = self.env.make_action(self.actions[a]) / 100.0
                     r = self.env.make_action(a)
                     d = self.env.is_episode_finished()

@@ -58,9 +58,6 @@ import sys
 import getopt
 import os
 import time
-
-import random
-
 PI= 3.14159265359
 
 data_size = 2**17
@@ -121,19 +118,14 @@ def bargraph(x,mn,mx,w,c='X'):
 class Client():
     def __init__(self,H=None,p=None,i=None,e=None,t=None,s=None,d=None,vision=False):
         # If you don't like the option defaults,  change them here.
+        self.server_shutdown = False  # Value indicating whether the server has been shutdown.
+
         self.vision = vision
-
-        tracks = ['a-speedway', 'michigan', 'alpine-1', 'corkscrew', 'ruudskogen']
-        track = random.choice(tracks)
-        t = track
-
-        print('Cruising on track ', track)
-
         self.host= 'localhost'
         self.port= 3001
         self.sid= 'SCR'
         self.maxEpisodes=1 # "Maximum number of learning episodes to perform"
-        self.trackname= track
+        self.trackname= 'unknown'
         self.stage= 3 # 0=Warm-up, 1=Qualifying 2=Race, 3=unknown <Default=3>
         self.debug= False
         self.maxSteps= 100000  # 50steps/second
@@ -148,6 +140,9 @@ class Client():
         self.ServerState= ServerState()
         self.R= DriverAction()
         self.setup_connection()
+
+    def is_server_shutdown(self):
+        return self.server_shutdown
 
     def setup_connection(self):
         # == Set Up UDP Socket ==
@@ -260,6 +255,9 @@ class Client():
                         "You were in %d place.") %
                        (self.port,self.ServerState.data['racePos'])))
                 self.shutdown()
+
+                self.server_shutdown = True
+                # self.setup_connection() # Make a new connection if another car pulled down the server.
                 return
             elif '***restart***' in sockdata:
                 # What do I do here?
